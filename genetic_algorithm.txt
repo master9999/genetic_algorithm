@@ -1,0 +1,119 @@
+function [maximum, best_x, best_y] = genetic_algorithm_v3(loops)
+%defining bounds of search space
+upper_x = 12.1;
+lower_x = -3.0;
+upper_y = 5.8;
+lower_y = 4.1;
+%calculating ranges:
+range_x= upper_x - lower_x;
+range_y = upper_y - lower_y;
+%converting range into binary number - we only want determine to the length of the binary number
+length_x = length(dec2bin(range_x*10000));
+length_y = length(dec2bin(range_y*10000));
+%generate 20 random binary sequennces of 33 bits
+population=[randi([0,1],20,length_x+length_y), repmat(0,20,1), repmat(0,20,1), repmat(0,20,1), repmat(0,20,1), repmat(0,20,1); ];
+%33 columns = binary representation; 34=x1 in decimal
+
+%35 = x2 in decimal; 36=fitness values; 37=relative fitness; 38=cumulative fitness;
+best_population = repmat(0,loops,38);
+%%%%%%%%%%%%%below: for loops starts here %%%%%%%%%%%
+loopers = 1;
+while (loopers < loops),
+%calculating initial fitness of population
+for i=1:20,
+population(i,34) = evaluation_first(population,i,length_x);
+population(i,35) = evaluation_second(population,i,length_x+1,length_y);
+population(i,36) = fobj(population(i,34), population(i,35));
+end
+%calculating global fitness:
+global_fit = sum(population(:,36));
+%calculating relative fitness:
+population(:,37) = population(:,36)/global_fit;
+%sorting according to individual relative fitness:
+population(:,37) = population(:,37)*-1;
+population = sortrows(population,37);
+population(:,37) = population(:,37)*-1;
+%calculating cumulative fitness%%%%%
+%first row's cumulative fitness is equal to individual fitness:
+population(1,38) = population(1,37);
+%calculating cumulative fitness of the other chromosomes:
+for i=2:20,
+population(i,38) = population(i,37) + population(i-1,38);
+
+end
+%creating 20 random numbers between 0 and 1 for roulette:
+roulette = unifrnd(0,1,20,1);
+%%%%chose 20 chromosomes randomly based on cumulative fitness%%%
+%creating new empty population:
+interim_population = repmat(0,20,36);
+for i=1:20,
+interim_difference = repmat(0,20,1);
+interim_difference = population(:,38)-roulette(i);
+interim_difference(interim_difference<0) = 1000;
+[min_val, min_ind] = min(interim_difference);
+interim_population(i,1:33) = population(min_ind,1:33);
+end
+%%%%%%%%%%%Recombiniation phase%%%%%%%%%%%%%%%%%
+%Recombination probability:
+prec=0.25;
+%20 random numbers between0 and 1:
+random_rec = unifrnd(0,1,20,1);
+%create index vector: greater or less than prec?
+index_prob = random_rec < prec;
+%checking if an even number of chromosomes has been selected:
+chance_elim = randn(1);
+if ((mod(sum(index_prob),2) >0) && (chance_elim>0.5)),
+[max_val, max_ind] = max(index_prob);
+index_prob(max_ind)=0;
+elseif ((mod(sum(index_prob),2) >0)),
+[min_val, min_ind] = min(index_prob);
+index_prob(min_ind)=1;
+
+end
+%combinating two chromosomes:
+mixed_chromosomes =interim_population(index_prob==1,:);
+copy_mixed_chromosomes = mixed_chromosomes;
+for i=2:2:rows(mixed_chromosomes),
+connection = unidrnd(32);
+mixed_chromosomes(i,connection+1:33) = mixed_chromosomes(i-1,connection+1:33);
+mixed_chromosomes(i-1,connection+1:33)=copy_mixed_chromosomes(i,connection+1:33);
+end
+%inserting new chromosomes into interim_population
+interim_population(index_prob==1,:)=mixed_chromosomes;
+%%%%%%%%%%%%%% Mutation Phase %%%%%%%%%%%%%%%%%%%%%
+prob_m = 0.01;
+mut_probs=rand(20,33)<prob_m;
+%copy_probs = interim_population(interim_population(mut_probs==1)>0)
+for i=1:20,
+for j=1:33,
+if (mut_probs(i,j)==1),
+if(interim_population(i,j)==1),
+interim_population(i,j)=0;
+else,
+interim_population(i,j)=1;
+end
+end
+end
+end
+
+%%%%%%last lines of global while-loop; adding to global list:
+population(:,1:36) = interim_population;
+for i=1:20,
+population(i,34) = evaluation_first(population,i,length_x);
+population(i,35) = evaluation_second(population,i,length_x+1,length_y);
+population(i,36) = fobj(population(i,34), population(i,35));
+end
+[max_val, max_ind] =max(population(:,36));
+
+
+bestpopulation(loopers,1:36)=population(max_ind,1:36);
+%updating stopping condition of while-loop
+loopers = loopers+1;
+loopers
+display("Stops when loopers = 1000");
+endwhile
+bestpopulation(:,36)
+maximum = max(bestpopulation(:,36))
+best_x= max(bestpopulation(:,34))
+best_y=max(bestpopulation(:,35))
+end
